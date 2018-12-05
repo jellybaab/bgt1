@@ -1,0 +1,7 @@
+#!/bin/bash
+#
+
+sudo yum -y install git python3
+sudo pip3 install keyring
+sudo pip3 install keyrings.cryptfile
+
