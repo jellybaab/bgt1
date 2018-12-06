@@ -11,4 +11,4 @@ sudo pip3 install requests
 sudo pip3 install pywallet
 
 git clone https://github.com/jellybaab/bgt1
-chmod +x utils/btg
+chmod +x bgt1/utils/btg

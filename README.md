@@ -3,6 +3,7 @@
 
 ## Intallation
 
+This is tuned for a t2.micro AWS Linux AMI.
 
 `curl https://raw.githubusercontent.com/jellybaab/bgt1/master/install/setup_bitgo_test | sh`
 
