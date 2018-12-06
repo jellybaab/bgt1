@@ -1,0 +1,94 @@
+#!/usr/bin/python3
+#
+
+import sys
+import keyring
+import requests
+import json
+
+def print_help():
+    print("btg command")
+    print("command:")
+    print("\tsession")
+
+
+def parse_args():
+    if len(sys.argv) == 1:
+        print_help()
+        sys.exit()
+
+
+def print_response(url, headers, r):
+    print("url = '" + url + "'")
+    print("status = " + str(r.status_code))
+    print(json.dumps(dict(r.headers), indent=4, sort_keys=True))
+    j = json.loads(r.text)
+    print(json.dumps(j, indent=4, sort_keys=True))
+
+
+def cmd_ping(base_url):
+    url = base_url + "v2/ping"
+    r = requests.get(url)
+    print_response(url, None, r)
+
+
+def cmd_constants(base_url, headers):
+    url = base_url + "v1/client/constants"
+    r = requests.get(url)
+    print_response(url, headers, r)
+
+
+def cmd_me(base_url, headers):
+    url = base_url + "v2/user/me"
+    r = requests.get(url, headers=headers)
+    print_response(r)
+    print_response(url, headers, r)
+
+
+def cmd_session(base_url, headers):
+    url = base_url + "v2/user/session"
+    #headers["Content-Type"] = "application/json"
+    r = requests.get(url, headers=headers)
+    print_response(url, headers, r)
+
+
+def cmd_list_wallets(base_url, headers, coin):
+    url = base_url + "v2/" + coin + "/wallet"
+    r = requests.get(url, headers=headers)
+    print_response(url, headers, r)
+
+
+
+parse_args()
+
+
+
+base_url = "https://test.bitgo.com/api/"
+
+command = sys.argv[1]
+num_args = len(sys.argv)
+
+if command != "ping":
+    api_key = keyring.get_password("bitgo", "api_key")
+    headers = {"Authorization": "Bearer " + api_key}
+    #print("api key is '" + api_key + "'")
+
+
+if command == "ping":
+    cmd_ping(base_url)
+elif command == "constants":
+    cmd_constants(base_url, headers)
+elif command == "me":
+    cmd_me(base_url, headers)
+elif command == "session":
+    cmd_session(base_url, headers)
+elif command == "list_wallets":
+    if num_args >= 3:
+        cmd_list_wallets(base_url, headers, sys.argv[2])
+    else:
+        print("list_wallets needs a coin, such as tbtc")
+else:
+    print("Command '" + command + "' not recognized")
+
+
+
