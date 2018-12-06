@@ -1,7 +1,14 @@
 #!/bin/bash
 #
 
-sudo yum -y install git python3
+#
+# Set uo machine for single use. If "sudi pip3 install" makes you queasy, use pipenv
+#
+sudo yum -y install git python3 python3-devel gcc
 sudo pip3 install keyring
 sudo pip3 install keyrings.cryptfile
+sudo pip3 install requests
+sudo pip3 install pywallet
 
+git clone https://github.com/jellybaab/bgt1
+chmod +x utils/btg

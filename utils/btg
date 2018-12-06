@@ -5,7 +5,51 @@ import sys
 import keyring
 import requests
 import json
+from pywallet import wallet
 
+
+
+#
+# Create Wallet support functions
+#
+
+def create_hd():
+    """From https://github.com/ranaroussi/pywallet"""
+    # generate 12 word mnemonic seed
+    seed = wallet.generate_mnemonic()
+
+    # create bitcoin wallet
+    w = wallet.create_wallet(network="BTC", seed=seed, children=1)
+    print(w)
+    print("xprv = " + w['xprivate_key'])
+    print("xpub = " + w['xpublic_key'])
+    return w
+
+
+def create_bitgo_hd(base_url, headers, coin):
+    url = base_url + "v2/" + coin + "/key"
+    user_options = { "source": "bitgo"}
+    print("create bitgo key: data = '" + str(user_options) + "'")
+    r = requests.post(url, headers=headers, json=user_options)
+    print_response(url, headers, r)
+    return r.json()
+
+
+def add_keychain(base_url, headers, coin, key):
+    url = base_url + "v2/" + coin + "/key"
+    headers["Content-Type"] = "application/json"
+    user_options = { "pub": key['xpublic_key']}
+    print("add keychain: data = '" + str(user_options) + "'")
+    r = requests.post(url, headers=headers, json=user_options)
+    print_response(url, headers, r)
+    return r.json()
+    
+
+
+
+#
+# Functions to process commands
+#
 def print_help():
     print("btg command")
     print("command:")
@@ -52,24 +96,62 @@ def cmd_session(base_url, headers):
     print_response(url, headers, r)
 
 
+def cmd_list_keychains(base_url, headers, coin):
+    url = base_url + "v2/" + coin + "/key"
+    r = requests.get(url, headers=headers)
+    print_response(url, headers, r)
+
+
 def cmd_list_wallets(base_url, headers, coin):
     url = base_url + "v2/" + coin + "/wallet"
     r = requests.get(url, headers=headers)
     print_response(url, headers, r)
 
 
+def cmd_create_wallet_advanced(base_url, headers, coin, wallet_label):
+    user_key = create_hd()
+    user_keychain = add_keychain(base_url, headers, coin, user_key)
+    user_key_id = user_keychain["id"]
+
+    backup_key = create_hd()
+    backup_keychain = add_keychain(base_url, headers, coin, backup_key)
+    backup_key_id = backup_keychain["id"]
+
+    bitgo_key = create_bitgo_hd(base_url, headers, coin)
+    bitgo_key_id = bitgo_key["id"]
+
+    url = base_url + "v2/" + coin + "/wallet"
+    user_options = { "label": wallet_label, "m": 2, "n": 3, "keys": [ user_key_id, backup_key_id, bitgo_key_id]}
+    print("create bitgo key: data = '" + str(user_options) + "'")
+    r = requests.post(url, headers=headers, json=user_options)
+    print_response(url, headers, r)
+
+
+#
+# Constants / configs - move to external file
+#
+
+# Use BitGo Express if you don't want the key to fly over the wire
+#base_url = "http://localhost:3080/api/"
+base_url = "https://test.bitgo.com/api/"
+
+# keyring directory
+keyring_system = "bitgo"
+keyring_api_key_key = "api_key"
+
+
+#
+# MAIN
+#
 
 parse_args()
 
-
-
-base_url = "https://test.bitgo.com/api/"
 
 command = sys.argv[1]
 num_args = len(sys.argv)
 
 if command != "ping":
-    api_key = keyring.get_password("bitgo", "api_key")
+    api_key = keyring.get_password(keyring_system, keyring_api_key_key)
     headers = {"Authorization": "Bearer " + api_key}
     #print("api key is '" + api_key + "'")
 
@@ -82,11 +164,21 @@ elif command == "me":
     cmd_me(base_url, headers)
 elif command == "session":
     cmd_session(base_url, headers)
-elif command == "list_wallets":
+elif command == "list_keychains" or command == "lk":
+    if num_args >= 3:
+        cmd_list_keychains(base_url, headers, sys.argv[2])
+    else:
+        print("list_keychains needs a coin, such as tbtc")
+elif command == "list_wallets" or command == "lw":
     if num_args >= 3:
         cmd_list_wallets(base_url, headers, sys.argv[2])
     else:
         print("list_wallets needs a coin, such as tbtc")
+elif command == "create_wallet_advanced" or command == "cwa":
+    if num_args >= 4:
+        cmd_create_wallet_advanced(base_url, headers, sys.argv[2], sys.argv[3])
+    else:
+        print("create_wallet_advanced needs a coin and a wallet label")
 else:
     print("Command '" + command + "' not recognized")
 
