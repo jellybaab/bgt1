@@ -7,7 +7,7 @@ import requests
 import json
 from pywallet import wallet
 
-
+VERBOSE=False
 
 #
 # Create Wallet support functions
@@ -23,6 +23,14 @@ def create_hd():
     return w
 
 
+def create_backup_hd(base_url, headers, coin):
+    url = base_url + "v2/" + coin + "/key"
+    user_options = { "source": "backup"}
+    r = requests.post(url, headers=headers, json=user_options)
+    print_response(url, headers, r)
+    return r.json()
+
+
 def create_bitgo_hd(base_url, headers, coin):
     url = base_url + "v2/" + coin + "/key"
     user_options = { "source": "bitgo"}
@@ -31,15 +39,17 @@ def create_bitgo_hd(base_url, headers, coin):
     return r.json()
 
 
-def add_keychain(base_url, headers, coin, key):
+def add_keychain(base_url, headers, coin, key, source=None):
     url = base_url + "v2/" + coin + "/key"
     headers["Content-Type"] = "application/json"
-    user_options = { "pub": key["xpublic_key"]}
+    user_options = { "pub": key}
+    if source != None:
+        user_options["source"] = source
+    print_verbose("add_keychain data='" + str(user_options) + "'")
     r = requests.post(url, headers=headers, json=user_options)
     print_response(url, headers, r)
     return r.json()
     
-
 
 #
 # Functions to process commands
@@ -66,11 +76,17 @@ def parse_args():
 
 
 def print_response(url, headers, r):
-    print("url = '" + url + "'")
-    print("status = " + str(r.status_code))
-    print(json.dumps(dict(r.headers), indent=4, sort_keys=True))
+    if VERBOSE:
+        print("url = '" + url + "'")
+        print("status = " + str(r.status_code))
+        print(json.dumps(dict(r.headers), indent=4, sort_keys=True))
     j = json.loads(r.text)
     print(json.dumps(j, indent=4, sort_keys=True))
+
+
+def print_verbose(s):
+    if VERBOSE:
+        print(s)
 
 
 def cmd_ping(base_url):
@@ -111,8 +127,8 @@ def cmd_list_wallets(base_url, headers, coin):
 
 def cmd_create_wallet_advanced(base_url, headers, coin, wallet_label):
     user_key = create_hd()
-    print("user key = " + str(user_key));
-    user_keychain = add_keychain(base_url, headers, coin, user_key)
+    print_verbose("user key = " + str(user_key));
+    user_keychain = add_keychain(base_url, headers, coin, user_key["xpublic_key"])
     user_key_id = user_keychain["id"]
 
     # This is where you would securely store user key material
@@ -121,8 +137,8 @@ def cmd_create_wallet_advanced(base_url, headers, coin, wallet_label):
     keyring.set_password(keyring_system, "user_key_id", user_key_id)
 
     backup_key = create_hd()
-    print("backup key = " + str(backup_key))
-    backup_keychain = add_keychain(base_url, headers, coin, backup_key)
+    print_verbose("backup key = " + str(backup_key))
+    backup_keychain = add_keychain(base_url, headers, coin, backup_key["xpublic_key"], "backup")
     backup_key_id = backup_keychain["id"]
 
     # This is where you would securely store backup key material
@@ -132,11 +148,12 @@ def cmd_create_wallet_advanced(base_url, headers, coin, wallet_label):
 
     bitgo_keychain = create_bitgo_hd(base_url, headers, coin)
     bitgo_key_id = bitgo_keychain["id"]
+    backup_keychain = add_keychain(base_url, headers, coin, bitgo_keychain["pub"], "bitgo")
 
     url = base_url + "v2/" + coin + "/wallet"
 
     user_options = { "label": wallet_label, "m": 2, "n": 3, "keys": [ user_key_id, backup_key_id, bitgo_key_id]}
-    print("create bitgo key: data = '" + str(user_options) + "'")
+    print_verbose("create bitgo key: data = '" + str(user_options) + "'")
     r = requests.post(url, headers=headers, json=user_options)
     print_response(url, headers, r)
 
@@ -167,7 +184,7 @@ num_args = len(sys.argv)
 if command != "ping":
     api_key = keyring.get_password(keyring_system, keyring_api_key_key)
     headers = {"Authorization": "Bearer " + api_key}
-    #print("api key is '" + api_key + "'")
+    print_verbose("api key is '" + api_key + "'")
 
 
 if command == "ping":
