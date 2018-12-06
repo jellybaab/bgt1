@@ -47,7 +47,16 @@ def add_keychain(base_url, headers, coin, key):
 def print_help():
     print("btg command")
     print("command:")
-    print("\tsession")
+    print("\tping                                  - Calls the ping api")
+    print("\tsession                               - Returns session information")
+    print("\tconstants                             - Returns client constants")
+    print("\tme                                    - Returns current user profile")
+    print("\tlist_keychains <COIN>                 - Lists keychains for a specific coin")
+    print("\tlk <COIN>                             - Same as list_keychains")
+    print("\tlist_wallets <COIN>                   - Lists wallets for a specific coin")
+    print("\tlw <COIN>                             - Same as list_wallets")
+    print("\tcreate_wallet_advanced <COIN> <LABEL> - Lists wallets for a specific coin")
+    print("\tcwa <COIN> <LABEL>                    - Same as create_wallet_advanced")
 
 
 def parse_args():
@@ -79,7 +88,6 @@ def cmd_constants(base_url, headers):
 def cmd_me(base_url, headers):
     url = base_url + "v2/user/me"
     r = requests.get(url, headers=headers)
-    print_response(r)
     print_response(url, headers, r)
 
 
