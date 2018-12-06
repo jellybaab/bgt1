@@ -25,5 +25,5 @@ keyring get bitgo api_key
 
 ## Running
 
-Change directory to the `utils` directory. The `btg` command will tell you what it can do by just typing `btg`
+Change directory to the `utils` directory. The `btg` command will tell you what it can do by just typing `./btg`
 
