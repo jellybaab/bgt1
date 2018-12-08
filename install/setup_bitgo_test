@@ -9,6 +9,7 @@ sudo pip3 install keyring
 sudo pip3 install keyrings.cryptfile
 sudo pip3 install requests
 sudo pip3 install pywallet
+sudo pip3 install sjcl
 
 git clone https://github.com/jellybaab/bgt1
 chmod +x bgt1/utils/btg

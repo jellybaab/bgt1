@@ -5,9 +5,11 @@ import sys
 import keyring
 import requests
 import json
+import getpass
 from pywallet import wallet
+from sjcl import SJCL
 
-VERBOSE=False
+VERBOSE=True
 
 #
 # Create Wallet support functions
@@ -39,12 +41,14 @@ def create_bitgo_hd(base_url, headers, coin):
     return r.json()
 
 
-def add_keychain(base_url, headers, coin, key, source=None):
+def add_keychain(base_url, headers, coin, key, source=None, encryptedPrv=None):
     url = base_url + "v2/" + coin + "/key"
     headers["Content-Type"] = "application/json"
     user_options = { "pub": key}
     if source != None:
         user_options["source"] = source
+    if encryptedPrv != None:
+        user_options["encryptedPrv"] = str(encryptedPrv)
     print_verbose("add_keychain data='" + str(user_options) + "'")
     r = requests.post(url, headers=headers, json=user_options)
     print_response(url, headers, r)
@@ -65,8 +69,12 @@ def print_help():
     print("\tlk <COIN>                             - Same as list_keychains")
     print("\tlist_wallets <COIN>                   - Lists wallets for a specific coin")
     print("\tlw <COIN>                             - Same as list_wallets")
-    print("\tcreate_wallet_advanced <COIN> <LABEL> - Lists wallets for a specific coin")
+    print("\tget_wallet_address <COIN> <WALLET ID> - Display wallet info, including it's receive address")
+    print("\tgwa <COIN> <LABEL>                    - Same as get_wallet_address")
+    print("\tcreate_wallet_advanced <COIN> <LABEL> - Create a wallet for a specific coin")
     print("\tcwa <COIN> <LABEL>                    - Same as create_wallet_advanced")
+    print("\tsend_transaction <COIN> <WALLET ID> <RECEIVE ADDRESS> <AMOUNT> - Send coinage")
+    print("\tst <COIN> <WALLET ID> <RECEIVE ADDRESS> <AMOUNT>               - Same as send_transaction")
 
 
 def parse_args():
@@ -78,10 +86,15 @@ def parse_args():
 def print_response(url, headers, r):
     if VERBOSE:
         print("url = '" + url + "'")
+        print("request headers = " + json.dumps(headers, indent=4, sort_keys=True))
         print("status = " + str(r.status_code))
-        print(json.dumps(dict(r.headers), indent=4, sort_keys=True))
-    j = json.loads(r.text)
-    print(json.dumps(j, indent=4, sort_keys=True))
+        print("response headers = " + json.dumps(dict(r.headers), indent=4, sort_keys=True))
+    try:
+        j = json.loads(r.text)
+        print(json.dumps(j, indent=4, sort_keys=True))
+    except Exception as ex:
+        #print("EXCEPTION '" + str(ex) + "'")
+        print("raw r.text = '" + str(r.text) + "'")
 
 
 def print_verbose(s):
@@ -126,9 +139,11 @@ def cmd_list_wallets(base_url, headers, coin):
 
 
 def cmd_create_wallet_advanced(base_url, headers, coin, wallet_label):
+    passwd = getpass.getpass("Enter password to encrypt xprivate key in wallet:")
     user_key = create_hd()
     print_verbose("user key = " + str(user_key));
-    user_keychain = add_keychain(base_url, headers, coin, user_key["xpublic_key"])
+    encryptedPrv = SJCL().encrypt(user_key["xprivate_key"].encode("iso-8859-15"), passwd)
+    user_keychain = add_keychain(base_url, headers, coin, user_key["xpublic_key"], None, encryptedPrv)
     user_key_id = user_keychain["id"]
 
     # This is where you would securely store user key material
@@ -158,12 +173,28 @@ def cmd_create_wallet_advanced(base_url, headers, coin, wallet_label):
     print_response(url, headers, r)
 
 
+def cmd_get_wallet_address(base_url, headers, coin, wallet_id):
+    url = base_url + "v2/" + coin + "/wallet/" + wallet_id
+    r = requests.get(url, headers=headers)
+    print_response(url, headers, r)
+
+
+def cmd_send_transaction(base_url, headers, coin, wallet_id, receive_address, amount):
+    # Need to send this via BitGo Express
+    passwd = getpass.getpass("Enter password to decrypt xprivate key in wallet:")
+    url = base_url + "v2/" + coin + "/wallet/" + wallet_id + "/sendcoins"
+    options = {"address": receive_address, "amount": amount, "walletPassphrase": passwd}
+    print_verbose("send_transaction options: '" + str(options) + "'")
+    headers["Content-Type"] = "application/json"
+    r = requests.get(url, headers=headers, json=options)
+    print_response(url, headers, r)
+
 #
 # Constants / configs - move to external file
 #
 
 # Use BitGo Express if you don't want the key to fly over the wire
-#base_url = "http://localhost:3080/api/"
+base_url_bitgo_express = "http://localhost:3080/api/"
 base_url = "https://test.bitgo.com/api/"
 
 # keyring directory
@@ -210,6 +241,16 @@ elif command == "create_wallet_advanced" or command == "cwa":
         cmd_create_wallet_advanced(base_url, headers, sys.argv[2], sys.argv[3])
     else:
         print("create_wallet_advanced needs a coin and a wallet label")
+elif command == "get_wallet_address" or command == "gwa":
+    if num_args >= 4:
+        cmd_get_wallet_address(base_url, headers, sys.argv[2], sys.argv[3])
+    else:
+        print("get_wallet_address needs a coin and a wallet id")
+elif command == "send_transation" or command == "st":
+    if num_args >= 6:
+        cmd_send_transaction(base_url, headers, sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+    else:
+        print("send_transaction needs a coin and a wallet id a receiver address and an amount")
 else:
     print("Command '" + command + "' not recognized")
 
